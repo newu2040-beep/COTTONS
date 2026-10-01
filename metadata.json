@@ -1,0 +1,6 @@
+{
+  "name": "Cottons",
+  "description": "A cozy paper-craft planner where your tasks are notes, your focus sessions are cassette tapes, your finished days earn wax seals, and your ideas live on a sticker board.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
