@@ -36,7 +36,6 @@ jobs:
           if [[ "$JAVA_VER_STRING" =~ \"([0-9]+)(\.[0-9]+)?.*\" ]]; then
             JAVA_MAJOR="${BASH_REMATCH[1]}"
             if [[ "$JAVA_MAJOR" == "1" && -n "${BASH_REMATCH[2]}" ]]; then
-              # For old 1.8 format if encountered
               JAVA_MAJOR="${BASH_REMATCH[2]#.}"
             fi
           else
@@ -122,7 +121,6 @@ jobs:
           ASSET_DIR="${{ runner.temp }}/release-assets"
           mkdir -p "$ASSET_DIR"
           
-          # Sanitize repository name
           RAW_REPO_NAME="${{ github.event.repository.name }}"
           if [ -z "$RAW_REPO_NAME" ]; then
             RAW_REPO_NAME=$(echo "${{ github.repository }}" | awk -F'/' '{print $2}')
@@ -163,22 +161,25 @@ jobs:
           RELEASE_TAG="debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
           RELEASE_TITLE="Debug APK Build #${{ github.run_number }}"
           
-          RELEASE_NOTES="### Automated Debug APK Build
+          NOTES_FILE="${{ runner.temp }}/release_notes.md"
+          cat > "$NOTES_FILE" << 'EOF'
+### Automated Debug APK Build
 
 This is an automatically generated debug APK build created by GitHub Actions.
 
 - **Workflow Run Number:** #${{ github.run_number }}
 - **Workflow Run Attempt:** ${{ github.run_attempt }}
-- **Source Commit SHA:** \`${{ github.sha }}\`
-- **Asset Filename:** \`${ASSET_NAME}\`
+- **Source Commit SHA:** `${{ github.sha }}`
+- **Asset Filename:** `${{ steps.prepare_asset.outputs.asset_name }}`
 
-> **Note:** This APK is built strictly for testing and verification purposes. It is not a production release for the Google Play Store and is signed with a temporary debug keystore."
+> **Note:** This APK is built strictly for testing and verification purposes. It is not a production release for the Google Play Store and is signed with a temporary debug keystore.
+EOF
           
           echo "Creating GitHub Release with tag: $RELEASE_TAG"
           gh release create "$RELEASE_TAG" "$ASSET_PATH" \
             --title "$RELEASE_TITLE" \
             --target "${{ github.sha }}" \
-            --notes "$RELEASE_NOTES" \
+            --notes-file "$NOTES_FILE" \
             --latest
           
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
@@ -206,27 +207,22 @@ This is an automatically generated debug APK build created by GitHub Actions.
             echo "Release URL: $RELEASE_URL"
             echo "APK Asset Name: $ASSET_NAME"
             
-            # View release via gh CLI for verification
             gh release view "$RELEASE_TAG" || true
             
-            cat << EOF >> "$GITHUB_STEP_SUMMARY"
-          ## 📱 Debug APK Release Published Successfully!
-          
-          - **Release Page:** [$RELEASE_TAG]($RELEASE_URL)
-          - **Direct Download Asset:** \`$ASSET_NAME\` (available under the release Assets section)
-          - **Artifact Backup:** The workflow artifact named \`app-debug-apk\` is also available for download.
-          - **Commit SHA:** \`${{ github.sha }}\`
-          EOF
+            echo "## 📱 Debug APK Release Published Successfully!" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Release Page:** [$RELEASE_TAG]($RELEASE_URL)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Direct Download Asset:** \`$ASSET_NAME\` (available under the release Assets section)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Artifact Backup:** The workflow artifact named \`app-debug-apk\` is also available for download." >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Commit SHA:** \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "::warning::GitHub Release publishing was not completed or failed."
             echo "The debug APK was built successfully and is preserved as a GitHub Actions artifact."
             echo "Artifact Name: app-debug-apk"
             
-            cat << EOF >> "$GITHUB_STEP_SUMMARY"
-          ## ⚠️ Debug APK Build Succeeded (Release Publishing Warning)
-          
-          - The debug APK was compiled successfully.
-          - The APK is preserved as a GitHub Actions artifact named **\`app-debug-apk\`**.
-          - GitHub Release publishing encountered an issue or was skipped, but your build artifact remains safe and available.
-          EOF
+            echo "## ⚠️ Debug APK Build Succeeded (Release Publishing Warning)" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "- The debug APK was compiled successfully." >> "$GITHUB_STEP_SUMMARY"
+            echo "- The APK is preserved as a GitHub Actions artifact named **\`app-debug-apk\`**." >> "$GITHUB_STEP_SUMMARY"
+            echo "- GitHub Release publishing encountered an issue or was skipped, but your build artifact remains safe and available." >> "$GITHUB_STEP_SUMMARY"
           fi
